@@ -2,10 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MAX_NAME 64
-#define MAX_CHILDREN 32
-#define MAX_HISTORY 64
-#define MAX_QUEUE 32
+#define max_name 64
+#define max_murgi 32
+#define max_history 64
+#define max_queue 32
 
 typedef enum
 {
@@ -15,71 +15,66 @@ typedef enum
 
 typedef struct Node
 {
-    char name[MAX_NAME];
+    char name[max_name];
     NodeType type;
-    struct Node *parent;
-    struct Node *children[MAX_CHILDREN];
-    int child_count;
+    struct Node *baba;
+    struct Node *murgiren[max_murgi];
+    int murgi_count;
 } Node;
 
-// Navigation history stack
 typedef struct
 {
-    Node *stack[MAX_HISTORY];
+    Node *stack[max_history];
     int top;
 } NavStack;
 
-// Batch queue for copy/move
 typedef struct
 {
-    Node *queue[MAX_QUEUE];
+    Node *queue[max_queue];
     int front, rear;
 } BatchQueue;
 
-// Root directory
 Node *root;
 Node *current;
 NavStack nav_stack;
 BatchQueue batch_queue;
 
-// Utility functions
-Node *create_node(const char *name, NodeType type, Node *parent)
+Node *create_node(const char *name, NodeType type, Node *baba)
 {
     Node *node = malloc(sizeof(Node));
-    strncpy(node->name, name, MAX_NAME);
+    strncpy(node->name, name, max_name);
     node->type = type;
-    node->parent = parent;
-    node->child_count = 0;
+    node->baba = baba;
+    node->murgi_count = 0;
     return node;
 }
 
-void add_child(Node *parent, Node *child)
+void add_murgi(Node *baba, Node *murgi)
 {
-    if (parent->child_count < MAX_CHILDREN)
+    if (baba->murgi_count < max_murgi)
     {
-        parent->children[parent->child_count++] = child;
+        baba->murgiren[baba->murgi_count++] = murgi;
     }
 }
 
-void remove_child(Node *parent, int idx)
+void remove_murgi(Node *baba, int idx)
 {
-    for (int i = idx; i < parent->child_count - 1; ++i)
-        parent->children[i] = parent->children[i + 1];
-    parent->child_count--;
+    for (int i = idx; i < baba->murgi_count - 1; ++i)
+        baba->murgiren[i] = baba->murgiren[i + 1];
+    baba->murgi_count--;
 }
 
-int find_child(Node *parent, const char *name)
+int find_murgi(Node *baba, const char *name)
 {
-    for (int i = 0; i < parent->child_count; ++i)
-        if (strcmp(parent->children[i]->name, name) == 0)
+    for (int i = 0; i < baba->murgi_count; ++i)
+        if (strcmp(baba->murgiren[i]->name, name) == 0)
             return i;
     return -1;
 }
 
-// Navigation stack functions
 void push_nav(Node *dir)
 {
-    if (nav_stack.top < MAX_HISTORY)
+    if (nav_stack.top < max_history)
         nav_stack.stack[nav_stack.top++] = dir;
 }
 
@@ -90,13 +85,12 @@ Node *pop_nav()
     return NULL;
 }
 
-// Batch queue functions
 void enqueue_batch(Node *file)
 {
-    if ((batch_queue.rear + 1) % MAX_QUEUE != batch_queue.front)
+    if ((batch_queue.rear + 1) % max_queue != batch_queue.front)
     {
         batch_queue.queue[batch_queue.rear] = file;
-        batch_queue.rear = (batch_queue.rear + 1) % MAX_QUEUE;
+        batch_queue.rear = (batch_queue.rear + 1) % max_queue;
     }
 }
 
@@ -105,87 +99,85 @@ Node *dequeue_batch()
     if (batch_queue.front != batch_queue.rear)
     {
         Node *file = batch_queue.queue[batch_queue.front];
-        batch_queue.front = (batch_queue.front + 1) % MAX_QUEUE;
+        batch_queue.front = (batch_queue.front + 1) % max_queue;
         return file;
     }
     return NULL;
 }
 
-// Command implementations
 void cmd_mkdir(const char *name)
 {
-    if (find_child(current, name) != -1)
+    if (find_murgi(current, name) != -1)
     {
         printf("Folder already exists.\n");
         return;
     }
     Node *dir = create_node(name, DIR_NODE, current);
-    add_child(current, dir);
+    add_murgi(current, dir);
 }
 
 void cmd_touch(const char *name)
 {
-    if (find_child(current, name) != -1)
+    if (find_murgi(current, name) != -1)
     {
         printf("File already exists.\n");
         return;
     }
     Node *file = create_node(name, FILE_NODE, current);
-    add_child(current, file);
+    add_murgi(current, file);
 }
 
 void cmd_rm(const char *name)
 {
-    int idx = find_child(current, name);
+    int idx = find_murgi(current, name);
     if (idx == -1)
     {
         printf("Not found.\n");
         return;
     }
-    Node *node = current->children[idx];
-    if (node->type == DIR_NODE && node->child_count > 0)
+    Node *node = current->murgiren[idx];
+    if (node->type == DIR_NODE && node->murgi_count > 0)
     {
         printf("Directory not empty.\n");
         return;
     }
     free(node);
-    remove_child(current, idx);
+    remove_murgi(current, idx);
 }
 
 void cmd_cd(const char *name)
 {
     if (strcmp(name, "..") == 0)
     {
-        if (current->parent)
+        if (current->baba)
         {
             push_nav(current);
-            current = current->parent;
+            current = current->baba;
         }
         return;
     }
-    int idx = find_child(current, name);
-    if (idx == -1 || current->children[idx]->type != DIR_NODE)
+    int idx = find_murgi(current, name);
+    if (idx == -1 || current->murgiren[idx]->type != DIR_NODE)
     {
         printf("Directory not found.\n");
         return;
     }
     push_nav(current);
-    current = current->children[idx];
+    current = current->murgiren[idx];
 }
 
 void cmd_ls()
 {
-    for (int i = 0; i < current->child_count; ++i)
+    for (int i = 0; i < current->murgi_count; ++i)
     {
-        Node *node = current->children[i];
+        Node *node = current->murgiren[i];
         printf("%s%s\n", node->name, node->type == DIR_NODE ? "/" : "");
     }
 }
 
-void cmd_search(const char *pattern)
+void cmd_search(const char *pattern) // bfs search korchi
 {
-    // BFS search
-    Node *queue[MAX_HISTORY];
+    Node *queue[max_history];
     int front = 0, rear = 0;
     queue[rear++] = root;
     while (front < rear)
@@ -193,8 +185,8 @@ void cmd_search(const char *pattern)
         Node *node = queue[front++];
         if (strstr(node->name, pattern) != NULL)
             printf("%s%s\n", node->name, node->type == DIR_NODE ? "/" : "");
-        for (int i = 0; i < node->child_count; ++i)
-            queue[rear++] = node->children[i];
+        for (int i = 0; i < node->murgi_count; ++i)
+            queue[rear++] = node->murgiren[i];
     }
 }
 
@@ -216,41 +208,40 @@ void cmd_undo()
 
 void cmd_batch(const char *action, const char *dest_name)
 {
-    int idx = find_child(current, dest_name);
-    if (idx == -1 || current->children[idx]->type != DIR_NODE)
+    int idx = find_murgi(current, dest_name);
+    if (idx == -1 || current->murgiren[idx]->type != DIR_NODE)
     {
         printf("Destination directory not found.\n");
         return;
     }
-    Node *dest = current->children[idx];
+    Node *dest = current->murgiren[idx];
     while (batch_queue.front != batch_queue.rear)
     {
         Node *file = dequeue_batch();
         if (strcmp(action, "copy") == 0)
         {
             Node *copy = create_node(file->name, FILE_NODE, dest);
-            add_child(dest, copy);
+            add_murgi(dest, copy);
         }
         else if (strcmp(action, "move") == 0)
         {
-            // Remove from current parent
-            int fidx = find_child(file->parent, file->name);
-            remove_child(file->parent, fidx);
-            file->parent = dest;
-            add_child(dest, file);
+            int fidx = find_murgi(file->baba, file->name);
+            remove_murgi(file->baba, fidx);
+            file->baba = dest;
+            add_murgi(dest, file);
         }
     }
 }
 
 void cmd_enqueue(const char *name)
 {
-    int idx = find_child(current, name);
-    if (idx == -1 || current->children[idx]->type != FILE_NODE)
+    int idx = find_murgi(current, name);
+    if (idx == -1 || current->murgiren[idx]->type != FILE_NODE)
     {
         printf("File not found.\n");
         return;
     }
-    enqueue_batch(current->children[idx]);
+    enqueue_batch(current->murgiren[idx]);
 }
 
 void print_prompt()
@@ -265,31 +256,31 @@ int main()
     nav_stack.top = 0;
     batch_queue.front = batch_queue.rear = 0;
 
-    char cmd[128], arg1[MAX_NAME], arg2[MAX_NAME];
+    char cmd[128], cmd1[max_name], cmd2[max_name];
     while (1)
     {
         print_prompt();
         fgets(cmd, sizeof(cmd), stdin);
-        if (sscanf(cmd, "mkdir %s", arg1) == 1)
-            cmd_mkdir(arg1);
-        else if (sscanf(cmd, "touch %s", arg1) == 1)
-            cmd_touch(arg1);
-        else if (sscanf(cmd, "rm %s", arg1) == 1)
-            cmd_rm(arg1);
-        else if (sscanf(cmd, "cd %s", arg1) == 1)
-            cmd_cd(arg1);
+        if (sscanf(cmd, "mkdir %s", cmd1) == 1)
+            cmd_mkdir(cmd1);
+        else if (sscanf(cmd, "touch %s", cmd1) == 1)
+            cmd_touch(cmd1);
+        else if (sscanf(cmd, "rm %s", cmd1) == 1)
+            cmd_rm(cmd1);
+        else if (sscanf(cmd, "cd %s", cmd1) == 1)
+            cmd_cd(cmd1);
         else if (strncmp(cmd, "ls", 2) == 0)
             cmd_ls();
-        else if (sscanf(cmd, "search %s", arg1) == 1)
-            cmd_search(arg1);
+        else if (sscanf(cmd, "search %s", cmd1) == 1)
+            cmd_search(cmd1);
         else if (strncmp(cmd, "history", 7) == 0)
             cmd_history();
         else if (strncmp(cmd, "undo", 4) == 0)
             cmd_undo();
-        else if (sscanf(cmd, "enqueue %s", arg1) == 1)
-            cmd_enqueue(arg1);
-        else if (sscanf(cmd, "batch %s %s", arg1, arg2) == 2)
-            cmd_batch(arg1, arg2);
+        else if (sscanf(cmd, "enqueue %s", cmd1) == 1)
+            cmd_enqueue(cmd1);
+        else if (sscanf(cmd, "batch %s %s", cmd1, cmd2) == 2)
+            cmd_batch(cmd1, cmd2);
         else if (strncmp(cmd, "exit", 4) == 0)
             break;
         else
